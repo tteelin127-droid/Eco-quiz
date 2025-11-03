@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Eco Quiz — 환경 퀴즈</title>
+<style>
+  :root{
+    --bg:#f4fbf7;
+    --card:#ffffff;
+    --accent:#2b8a6b;
+    --muted:#6b7280;
+    --correct:#16a34a;
+    --wrong:#dc2626;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family: "Noto Sans KR", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    background:linear-gradient(180deg,#e6fff3 0%, var(--bg) 100%);
+    color:#0f172a;
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+  }
+
+  .container{
+    width:100%;
+    max-width:760px;
+    background:var(--card);
+    border-radius:14px;
+    box-shadow:0 10px 30px rgba(15,23,42,0.08);
+    padding:28px;
+    position:relative;
+    overflow:hidden;
+  }
+
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  header h1{margin:0;font-size:1.25rem;color:var(--accent)}
+  .sub{color:var(--muted);font-size:0.9rem}
+
+  .progress{
+    height:10px;
+    background:linear-gradient(90deg,#e6f6ef,#f0f7ff);
+    border-radius:999px;
+    overflow:hidden;
+    margin:14px 0;
+  }
+  .progress > i{
+    display:block;
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg,#2b8a6b,#34d399);
+    transition:width 400ms ease;
+  }
+
+  .card{
+    padding:18px;
+    border-radius:12px;
+    background:linear-gradient(180deg,#ffffff,#fbfffc);
+    box-shadow:0 4px 18px rgba(11,15,20,0.04) inset;
+    min-height:250px;
+  }
+
+  .qtext{
+    font-size:1.05rem;
+    margin-bottom:14px;
+    line-height:1.5;
+  }
+
+  .choices{display:flex;flex-direction:column;gap:10px}
+  .choice{
+    border-radius:10px;
+    border:1px solid #e6eef0;
+    padding:10px 12px;
+    cursor:pointer;
+    transition:all 180ms ease;
+    background:linear-gradient(180deg,#fff,#fbfffe);
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .choice input{display:none}
+  .choice .label{
+    font-size:0.98rem;
+  }
+  .choice:hover{transform:translateY(-3px); box-shadow:0 8px 22px rgba(10,20,20,0.04)}
+  .choice.selected{border-color:var(--accent); box-shadow:0 8px 22px rgba(46,128,98,0.08)}
+  .choice.correct{border-color:var(--correct); background:linear-gradient(180deg,#f0fff5,#e6fff0)}
+  .choice.wrong{border-color:var(--wrong); background:linear-gradient(180deg,#fff5f5,#fff0f0)}
+
+  .controls{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    margin-top:18px;
+  }
+  button{
+    background:var(--accent);
+    color:white;
+    padding:10px 14px;
+    border-radius:10px;
+    border:0;
+    cursor:pointer;
+    font-weight:600;
+  }
+  button[disabled]{opacity:0.5; cursor:not-allowed}
+
+  .small{color:var(--muted); font-size:0.92rem}
+
+  /* Result screen */
+  .result{
+    text-align:center;
+    padding:24px;
+  }
+  .score{
+    font-size:2.6rem;
+    font-weight:800;
+    color:var(--accent);
+    margin:8px 0;
+  }
+  .message{font-size:1.05rem;color:var(--muted);margin-bottom:12px}
+
+  /* Balloons & popping */
+  .balloon-stage{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:30;
+    overflow:hidden;
+  }
+  .balloon{
+    position:absolute;
+    bottom:-140px;
+    width:56px;
+    height:72px;
+    border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;
+    transform-origin:center bottom;
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    transition:transform 300ms ease, opacity 300ms ease;
+    animation:floatUp linear infinite;
+  }
+  .balloon::after{
+    content:"";
+    width:2px;
+    height:36px;
+    background:rgba(0,0,0,0.08);
+    display:block;
+    transform:translateY(6px);
+  }
+  @keyframes floatUp{
+    0%{transform: translateY(0) translateX(0) rotate(0deg)}
+    100%{transform: translateY(-140vh) translateX(20px) rotate(250deg)}
+  }
+  .balloon.popped{
+    transform:scale(0);
+    opacity:0;
+  }
+
+  /* burst particle */
+  .burst {
+    position:absolute;
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #fff 0%, rgba(255,255,255,0.0) 70%);
+    pointer-events:none;
+    transform:translate(-50%,-50%) scale(0.9);
+    animation:burstAnim 600ms ease forwards;
+  }
+  @keyframes burstAnim {
+    to {
+      transform: translate(-50%,-50%) scale(0);
+      opacity:0;
+    }
+  }
+
+  /* confetti fallback */
+  .confetti{
+    position:absolute;
+    inset:0;
+    pointer-events:none;
+    z-index:29;
+  }
+  .confetti-piece{
+    position:absolute;
+    width:8px;height:12px;
+    opacity:0;
+    transform-origin:center;
+    animation:confettiDrop 1400ms linear forwards;
+  }
+  @keyframes confettiDrop{
+    0%{opacity:1; transform:translateY(-10vh) rotate(0deg)}
+    100%{opacity:1; transform:translateY(110vh) rotate(720deg)}
+  }
+
+  /* small responsive tweaks */
+  @media (max-width:520px){
+    .container{padding:18px}
+    .qtext{font-size:1rem}
+  }
+
+</style>
+</head>
+<body>
+  <div class="container" id="app">
+    <header>
+      <div>
+        <h1>Eco Quiz — 환경 퀴즈</h1>
+        <div class="sub">한국 고등학교 수준 • 총 10문제</div>
+      </div>
+      <div class="small" id="qcount">문제 1 / 10</div>
+    </header>
+
+    <div class="progress" aria-hidden="true">
+      <i id="progbar" style="width:0%"></i>
+    </div>
+
+    <main class="card" id="card">
+      <!-- question area -->
+      <div id="questionArea">
+        <div class="qtext" id="qtext">로딩 중...</div>
+        <div class="choices" id="choices"></div>
+
+        <div class="controls">
+          <div class="small" id="feedback"></div>
+          <div style="display:flex;gap:8px">
+            <button id="prevBtn" style="background:#94a3b8">이전</button>
+            <button id="nextBtn" disabled>다음</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="resultArea" style="display:none" class="result" aria-live="polite">
+        <div class="message" id="finalMessage">결과</div>
+        <div class="score" id="finalScore">0 / 10</div>
+        <div class="small" id="finalText"></div>
+        <div style="margin-top:16px">
+          <button id="retryBtn">다시 풀기</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Balloons container -->
+    <div class="balloon-stage" id="balloonStage" aria-hidden="true"></div>
+    <div class="confetti" id="confetti"></div>
+  </div>
+
+<script>
+/* --- 문제 데이터 (한국어, 고등학교 수준) --- */
+const questions = [
+  {
+    q: "1) 온실효과를 일으키는 주요 온실가스가 아닌 것은?",
+    choices:["이산화탄소(CO₂)","메탄(CH₄)","질소(N₂)","아산화질소(N₂O)"],
+    a: 2 // 질소는 온실가스 아님
+  },
+  {
+    q: "2) 생물 다양성(biodiversity)이 감소하면 생태계에서 가장 직접적으로 감소할 가능성이 높은 것은?",
+    choices:["에너지(태양광)량","생태계의 안정성과 회복력","지구의 자전속도","행성의 공전궤도"],
+    a: 1
+  },
+  {
+    q: "3) 부영양화(eutrophication)의 주된 원인은 무엇인가?",
+    choices:["영양염류(질소·인)의 과다 유입","해수면 상승","해양 산성화","오존층 파괴"],
+    a: 0
+  },
+  {
+    q: "4) 재생 가능 에너지에 속하지 않는 것은?",
+    choices:["태양광 발전","풍력 발전","석탄 화력 발전","지열 발전"],
+    a: 2
+  },
+  {
+    q: "5) 오존층(성층권 오존)의 감소로 직접적으로 증가하는 위험은?",
+    choices:["자외선(UV-B) 증가로 인한 피부암 및 식물 손상","지진 발생 빈도 증가","이산화탄소 축적","해수 온도 상승"],
+    a: 0
+  },
+  {
+    q: "6) 생태계에서의 '서식지 파편화(habitat fragmentation)'가 야기하는 문제로 옳지 않은 것은?",
+    choices:["종의 고립으로 다양성 감소","이동 경로 단절","유전자 교류 증가","소규모 집단의 멸종위험 증가"],
+    a: 2
+  },
+  {
+    q: "7) 다음 중 탄소흡수원(carbon sink)에 해당하는 것은?",
+    choices:["열대우림","석유 매장지(지하에 갇힌 화석연료)","내연기관 자동차","플라스틱 폐기물 소각장"],
+    a: 0
+  },
+  {
+    q: "8) '지구 평균기온 상승을 1.5°C 이내로 제한'하는 목표는 어느 국제협약/보고서에서 강조되었나?",
+    choices:["파리협정(Paris Agreement)","몬트리올 의정서(Montreal Protocol)","교토의정서(Kyoto Protocol)","런던협약"],
+    a: 0
+  },
+  {
+    q: "9) 해양 산성화의 직접적 원인은 무엇인가?",
+    choices:["바다에 용해된 이산화탄소 증가","해류의 속도 저하","바닷물의 염분 증가","플랑크톤의 수 증가"],
+    a: 0
+  },
+  {
+    q: "10) 지속가능발전(sustainable development)의 핵심 개념으로 옳은 것은?",
+    choices:["현재 세대의 필요를 충족시키되 미래 세대의 능력을 해치지 않는 개발","오직 경제성장만을 최우선으로 하는 개발","자원 채굴을 무제한 확대하는 전략","환경 규제를 완화하여 산업을 보호하는 것"],
+    a: 0
+  }
+];
+
+
+/* --- UI state --- */
+let currentIndex = 0;
+let selected = null;
+let answers = Array(questions.length).fill(null); // 사용자가 선택한 인덱스
+const total = questions.length;
+
+/* --- DOM --- */
+const qtext = document.getElementById('qtext');
+const choicesEl = document.getElementById('choices');
+const nextBtn = document.getElementById('nextBtn');
+const prevBtn = document.getElementById('prevBtn');
+const qcount = document.getElementById('qcount');
+const progbar = document.getElementById('progbar');
+const feedback = document.getElementById('feedback');
+const resultArea = document.getElementById('resultArea');
+const questionArea = document.getElementById('questionArea');
+const finalScore = document.getElementById('finalScore');
+const finalMessage = document.getElementById('finalMessage');
+const finalText = document.getElementById('finalText');
+const retryBtn = document.getElementById('retryBtn');
+const balloonStage = document.getElementById('balloonStage');
+const confettiEl = document.getElementById('confetti');
+
+function renderQuestion(i){
+  const item = questions[i];
+  qcount.textContent = `문제 ${i+1} / ${total}`;
+  progbar.style.width = `${Math.round((i/total)*100)}%`;
+  qtext.textContent = item.q;
+  choicesEl.innerHTML = '';
+  selected = answers[i];
+
+  item.choices.forEach((c, idx) => {
+    const div = document.createElement('label');
+    div.className = 'choice';
+    if (selected === idx) div.classList.add('selected');
+    div.innerHTML = `
+      <input type="radio" name="choice" value="${idx}">
+      <span class="label">${String.fromCharCode(65+idx)}. ${c}</span>
+    `;
+    div.addEventListener('click', (e)=>{
+      // 선택 처리
+      answers[currentIndex] = idx;
+      // 시각화
+      Array.from(choicesEl.children).forEach(ch => ch.classList.remove('selected'));
+      div.classList.add('selected');
+      nextBtn.disabled = false;
+      feedback.textContent = '';
+    });
+    choicesEl.appendChild(div);
+  });
+
+  // Prev/Next button state
+  prevBtn.disabled = (i === 0);
+  nextBtn.textContent = (i === total -1 ? '제출' : '다음');
+  nextBtn.disabled = (answers[i] === null);
+}
+
+nextBtn.addEventListener('click', ()=>{
+  if (nextBtn.disabled) return;
+  // 만약 마지막 문제라면 제출
+  if (currentIndex === total - 1){
+    showResult();
+    return;
+  }
+  currentIndex++;
+  renderQuestion(currentIndex);
+});
+
+prevBtn.addEventListener('click', ()=>{
+  if (currentIndex > 0){
+    currentIndex--;
+    renderQuestion(currentIndex);
+  }
+});
+
+function showResult(){
+  // calculate score
+  let score = 0;
+  for(let i=0;i<total;i++){
+    if (answers[i] === questions[i].a) score++;
+  }
+
+  // 숨기기 및 결과 표시
+  questionArea.style.display = 'none';
+  resultArea.style.display = 'block';
+  progbar.style.width = '100%';
+  finalScore.textContent = `${score} / ${total}`;
+
+  // 메시지
+  if (score >= 8){
+    finalMessage.textContent = "축하합니다! 대단해요 🎉";
+    finalText.textContent = "8문제 이상 정답을 맞히셨어요. 풍선을 터뜨려 축하합니다!";
+    // 트리거 풍선 팝
+    triggerBalloons();
+  } else if (score >= 5){
+    finalMessage.textContent = "잘했어요!";
+    finalText.textContent = "환경에 대해 잘 알고 계시네요. 더 공부해보면 더 좋습니다.";
+  } else {
+    finalMessage.textContent = "도전해보세요!";
+    finalText.textContent = "조금 더 학습하면 다음에는 더 좋은 성적을 기대할 수 있어요.";
+  }
+}
+
+retryBtn.addEventListener('click', ()=>{
+  // reset
+  currentIndex = 0;
+  answers = Array(total).fill(null);
+  questionArea.style.display = 'block';
+  resultArea.style.display = 'none';
+  balloonStage.innerHTML = '';
+  confettiEl.innerHTML = '';
+  progbar.style.width = '0%';
+  renderQuestion(currentIndex);
+});
+
+/* --- Balloon / Pop animation --- */
+function random(min,max){ return Math.random()*(max-min)+min; }
+
+function triggerBalloons(){
+  // create several balloons
+  const colors = ['#f97316','#fb7185','#60a5fa','#34d399','#a78bfa','#facc15'];
+  const count = 12;
+  const w = balloonStage.clientWidth || window.innerWidth;
+  for(let i=0;i<count;i++){
+    const b = document.createElement('div');
+    b.className = 'balloon';
+    b.style.left = `${(i/count)*100 + random(-5,5)}%`;
+    b.style.background = colors[i % colors.length];
+    b.style.animationDuration = `${random(10,18)}s`;
+    b.style.animationDelay = `${random(0,3)}s`;
+    b.style.width = `${random(44,70)}px`;
+    b.style.height = `${random(54,90)}px`;
+    // slight horizontal shift
+    b.style.transform = `translateY(0) translateX(${random(-20,20)}px)`;
+    balloonStage.appendChild(b);
+  }
+
+  // Make confetti as well
+  createConfetti();
+
+  // pop balloons sequentially for visual effect
+  const balloons = Array.from(balloonStage.children);
+  balloons.forEach((b, idx) => {
+    setTimeout(() => {
+      popBalloon(b);
+    }, 700 + idx*220);
+  });
+}
+
+function popBalloon(el){
+  // burst particles
+  const rect = el.getBoundingClientRect();
+  const parentRect = balloonStage.getBoundingClientRect();
+  const cx = rect.left + rect.width/2 - parentRect.left;
+  const cy = rect.top + rect.height/2 - parentRect.top;
+
+  for(let p=0;p<8;p++){
+    const part = document.createElement('div');
+    part.className = 'burst';
+    part.style.left = `${cx + random(-6,6)}px`;
+    part.style.top = `${cy + random(-6,6)}px`;
+    part.style.background = getRandomBright();
+    part.style.animationDuration = `${400 + Math.random()*400}ms`;
+    part.style.transform = `translate(-50%,-50%) translate(${random(-60,60)}px, ${random(-60,60)}px)`;
+    balloonStage.appendChild(part);
+    // remove after animation
+    setTimeout(()=> part.remove(), 900);
+  }
+
+  // pop the balloon
+  el.classList.add('popped');
+  // remove after short delay
+  setTimeout(()=> el.remove(), 700);
+}
+
+function getRandomBright(){
+  const arr = ['#ff7ab6','#ffd166','#81fbb8','#a0e7e5','#bdb2ff','#ffb475','#ff8fab'];
+  return arr[Math.floor(Math.random()*arr.length)];
+}
+
+/* --- Confetti pieces --- */
+function createConfetti(){
+  const pieces = 40;
+  const width = confettiEl.clientWidth || window.innerWidth;
+  for(let i=0;i<pieces;i++){
+    const pc = document.createElement('div');
+    pc.className = 'confetti-piece';
+    pc.style.left = `${Math.random()*100}%`;
+    pc.style.top = `${-10 - Math.random()*20}vh`;
+    pc.style.width = `${6 + Math.random()*8}px`;
+    pc.style.height = `${8 + Math.random()*12}px`;
+    pc.style.background = getRandomBright();
+    pc.style.animationDelay = `${Math.random()*800}ms`;
+    pc.style.transform = `translateY(-10vh) rotate(${Math.random()*360}deg)`;
+    pc.style.opacity = 1;
+    confettiEl.appendChild(pc);
+    // remove later
+    setTimeout(()=> pc.remove(), 2200 + Math.random()*800);
+  }
+}
+
+/* --- Initialize --- */
+renderQuestion(currentIndex);
+
+// Accessibility / keyboard support: Enter to proceed if next enabled
+document.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter'){
+    if (!nextBtn.disabled) nextBtn.click();
+  } else if (e.key === 'ArrowLeft'){
+    if (!prevBtn.disabled) prevBtn.click();
+  } else if (e.key === 'ArrowRight'){
+    if (!nextBtn.disabled) nextBtn.click();
+  }
+});
+</script>
+</body>
+</html>
